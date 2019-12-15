@@ -1,0 +1,142 @@
+# -*- coding:utf-8 -*-
+from bs4 import BeautifulSoup
+from selenium import webdriver
+import  requests
+import  request
+import  time
+import  re
+"""
+本脚本用于爬取财富网龙虎榜数据
+1，点击首页新股
+2，选择所有开头非688 且在指定日期内的股票
+3，进入数据页面，选择明细
+4，进入明细页面，选择买入前五的营业部数据
+"""
+baseurl = "http://www.eastmoney.com"
+driver = webdriver.Chrome()
+
+
+"""获得明细链接的龙虎榜数据"""
+def get_deatail_data(href):
+    ret_list = []
+    driver.get(href)
+    time.sleep(3)
+    datail_content = driver.execute_script("return document.documentElement.outerHTML")
+    # tab-2 > tbody
+    datail_soup = BeautifulSoup(datail_content,'lxml')
+    tr_list_soup = datail_soup.select('#tab-2 > tbody')
+    index = 1;
+
+    print(tr_list_soup[0])
+    for tr in tr_list_soup[0]:
+        str_selector = '#tab-2 > tbody > tr:nth-child({}) > td:nth-child(2) > div.sc-name > a:nth-child(2)'.format(
+            index)
+        part_soup = datail_soup.select(str_selector)
+        print(part_soup[0])
+        ret_list.append(part_soup[0].string)
+        index = index + 1
+    return ret_list
+
+#tab-2 > tbody > tr:nth-child(1) > td:nth-child(2) > div.sc-name > a:nth-child(2)
+#tab-2 > tbody > tr:nth-child(2) > td:nth-child(2) > div.sc-name > a:nth-child(2)
+# tab-2 > tbody > tr:nth-child(3) > td:nth-child(2) > div.sc-name > a:nth-child(2)
+
+"""获得新股连接的url地址"""
+def get_new_share_url():
+    # 得到东方财富网首页数据
+    main_page_ret = requests.get(baseurl)
+    main_page_soup = BeautifulSoup(main_page_ret.text, 'lxml')
+    # print(main_page_ret.text)
+    # 右键点击新股票，在右键 copy->selector,得到如下字符串
+    new_share_path = 'body > div.main.search-module > div.hq-nav > div > div.hq-con > div.hq-con-data.hqzx-data > div.menu-data.hqzx-menu > a:nth-child(9)'
+    new_share_content = main_page_soup.select(new_share_path)
+    assert len(new_share_content) == 1
+    print(new_share_content[0],1)
+    return new_share_content[0].get('href')
+
+    # for tr in new_share_content[0].find_all('tr'):
+    #     href = t.find('a').get('href')
+
+
+"""通过营业部数据链接获取买入前五名的营业部名字"""
+def get_buisness_part_list(stock_data_url):
+    print(stock_data_url)
+    driver.get(stock_data_url)
+    time.sleep(3)
+    buisness_part_html = driver.execute_script("return document.documentElement.outerHTML")
+    buisness_part_soup = BeautifulSoup(buisness_part_html,'lxml')
+    tr_body_soup = buisness_part_soup.select('#m_lhbd > div > table > tbody')
+    # m_lhbd > div > table > tbody > tr:nth-child(1)
+    assert len(tr_body_soup) > 0
+    tr_body_soup = tr_body_soup[0]
+
+
+
+
+
+"""获得数据行的url"""
+def get_data_url_soup(stock_list_soup, row_index):
+    str_code_str = '#table_wrapper-table > tbody > tr:nth-child({}) > td.listview-col-Links > a:nth-child(3)'.format(row_index)
+    soup = stock_list_soup.select(str_code_str)
+    return soup
+
+"""获得股票名称，代码，上市日期的soup"""
+def get_table_soup(stock_list_soup, row_index,sub_index):
+    str_code_str = '#table_wrapper-table > tbody > tr:nth-child({}) > td:nth-child({})'.format(row_index, sub_index)
+    soup = stock_list_soup.select(str_code_str)
+    return soup
+
+if __name__ == '__main__':
+    new_share_url = get_new_share_url()
+    print(new_share_url)
+    driver.get(new_share_url)
+    time.sleep(3)
+    stock_list_html =  driver.execute_script("return document.documentElement.outerHTML")
+    #print(stock_list_html)
+    stock_list_soup = BeautifulSoup(stock_list_html,'lxml')
+    #每一列的索引下标
+    row_index = 1
+    code_index = 2
+    stock_name_index = 3
+    data_url_index = 4
+    listed_date_index = 18
+    year = 2019
+    month = 11
+    input_data = '{}-{}-01'.format(year,month)
+    if month+1 > 12:
+        year = year+1
+        month = month + 1
+    input_data_end = '{}-{}-01'.format(year,month+1)
+    stock_pattern = re.compile('^688\d{3}$')
+    print(input_data,input_data_end)
+    while row_index<=20:
+        """筛掉所有小于给定日期的股票"""
+        listed_date_soup = get_table_soup(stock_list_soup,row_index,listed_date_index)
+        listed_date = listed_date_soup[0].string
+        print(row_index,listed_date)
+        if listed_date > input_data_end:
+            row_index = row_index + 1
+            continue
+        if listed_date < input_data:
+            break
+        code_soup = get_table_soup(stock_list_soup, row_index, code_index)
+        stack_code = code_soup[0].a.string
+
+        print(stack_code)
+        """筛掉所有以688开头的6位数股票"""
+        if  stock_pattern.search(stack_code):
+            row_index = row_index + 1
+            continue
+        stock_name_soup = get_table_soup(stock_list_soup, row_index, stock_name_index)
+        stock_name = stock_name_soup[0].a.string
+        data_url_soup = get_data_url_soup(stock_list_soup,row_index)
+        # table_wrapper-table > tbody > tr:nth-child(15) > td.listview-col-Links > a:nth-child(3)
+        stock_data_url = data_url_soup[0].get('href')
+        get_buisness_part_list(stock_data_url)
+        row_index = row_index + 1
+
+
+
+
+
+
