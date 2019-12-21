@@ -1,6 +1,9 @@
 # -*- coding:utf-8 -*-
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 import  requests
 import  request
 import  time
@@ -13,8 +16,8 @@ import  re
 4，进入明细页面，选择买入前五的营业部数据
 """
 baseurl = "http://www.eastmoney.com"
-driver = webdriver.Chrome()
-
+driver = webdriver.Chrome('C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe')
+#//*[@id="main-table_paginate"]/a[2]
 
 """获得明细链接的龙虎榜数据"""
 def get_deatail_data(href):
@@ -28,7 +31,6 @@ def get_deatail_data(href):
     datail_soup = BeautifulSoup(datail_content,'lxml')
     tr_list_soup = datail_soup.select('#tab-2 > tbody')
     index = 1
-
     for tr in tr_list_soup[0]:
         str_selector = '#tab-2 > tbody > tr:nth-child({}) > td:nth-child(2) > div.sc-name > a:nth-child(2)'.format(index)
         part_soup = datail_soup.select(str_selector)
@@ -53,7 +55,6 @@ def get_new_share_url():
     new_share_path = 'body > div.main.search-module > div.hq-nav > div > div.hq-con > div.hq-con-data.hqzx-data > div.menu-data.hqzx-menu > a:nth-child(9)'
     new_share_content = main_page_soup.select(new_share_path)
     assert len(new_share_content) == 1
-    print(new_share_content[0],1)
     return new_share_content[0].get('href')
 
     # for tr in new_share_content[0].find_all('tr'):
@@ -75,16 +76,11 @@ def get_buisness_part_list(stock_data_url):
     ret_list = []
     a_list = tr_body_soup.find_all('a')
     for elem in a_list:
-        print(elem)
         if(elem.string != '明细'):
             continue
         part_lsit = get_deatail_data(elem.get('href'))
         ret_list.append(part_lsit)
-    print(ret_list)
-
-
-
-
+    return ret_list
 
 """获得数据行的url"""
 def get_data_url_soup(stock_list_soup, row_index):
@@ -94,9 +90,9 @@ def get_data_url_soup(stock_list_soup, row_index):
 
 """获得股票名称，代码，上市日期的soup"""
 def get_table_soup(stock_list_soup, row_index,sub_index):
-    str_code_str = '#table_wrapper-table > tbody > tr:nth-child({}) > td:nth-child({})'.format(row_index, sub_index)
-    soup = stock_list_soup.select(str_code_str)
-    return soup
+    str_info = '#table_wrapper-table > tbody > tr:nth-child({}) > td:nth-child({})'.format(row_index, sub_index)
+    soup = stock_list_soup.select(str_info)
+    return soup,str_info
 
 if __name__ == '__main__':
     new_share_url = get_new_share_url()
@@ -114,6 +110,8 @@ if __name__ == '__main__':
     listed_date_index = 18
     year = 2019
     month = 11
+    # table_wrapper-table > tbody > tr:nth-child(1) > td:nth-child(18)
+    # table_wrapper-table > tbody > tr:nth-child(2) > td:nth-child(18)
     input_data = '{}-{}-01'.format(year,month)
     if month+1 > 12:
         year = year+1
@@ -121,9 +119,19 @@ if __name__ == '__main__':
     input_data_end = '{}-{}-01'.format(year,month+1)
     stock_pattern = re.compile('^688\d{3}$')
     print(input_data,input_data_end)
+    final_info = []
     while 1:
+        if(row_index > 20):
+            row_index = 1
+            driver.find_elements_by_xpath("//*[@id=\"main-table_paginate\"]/a[2]")[0].click()
+            driver.get(new_share_url)
+            time.sleep(3)
+            driver.get(new_share_url)
+            stock_list_html = driver.execute_script("return document.documentElement.outerHTML")
+            # print(stock_list_html)
+            stock_list_soup = BeautifulSoup(stock_list_html, 'lxml')
         """筛掉所有小于给定日期的股票"""
-        listed_date_soup = get_table_soup(stock_list_soup,row_index,listed_date_index)
+        listed_date_soup,str_stock_date = get_table_soup(stock_list_soup,row_index,listed_date_index)
         listed_date = listed_date_soup[0].string
         print(row_index,listed_date)
         if listed_date > input_data_end:
@@ -144,8 +152,13 @@ if __name__ == '__main__':
         data_url_soup = get_data_url_soup(stock_list_soup,row_index)
         # table_wrapper-table > tbody > tr:nth-child(15) > td.listview-col-Links > a:nth-child(3)
         stock_data_url  = data_url_soup[0].get('href')
-        get_buisness_part_list(stock_data_url)
+        part_list = get_buisness_part_list(stock_data_url)
+        #final_dic = {"股票代码":str_stock_code,"股票名称":str_stock_name,"上市日期":str_stock_date,"营业部信息":part_list}
+        final_info.append(final_dic)
         row_index = row_index + 1
+    print(final_info)
+    driver.quit()
+
 
 
 
