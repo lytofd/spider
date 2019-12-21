@@ -8,6 +8,7 @@ import  requests
 import  request
 import  time
 import  re
+import  copy
 """
 本脚本用于爬取财富网龙虎榜数据
 1，点击首页新股
@@ -16,21 +17,25 @@ import  re
 4，进入明细页面，选择买入前五的营业部数据
 """
 baseurl = "http://www.eastmoney.com"
-driver = webdriver.Chrome('C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe')
+
 #//*[@id="main-table_paginate"]/a[2]
 
 """获得明细链接的龙虎榜数据"""
 def get_deatail_data(href):
     ret_list = []
     href = 'http://data.eastmoney.com' + href
-
+    driver = webdriver.Chrome('C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe')
     driver.get(href)
     time.sleep(2)
+    driver.get(href)
     datail_content = driver.execute_script("return document.documentElement.outerHTML")
     # tab-2 > tbody
     datail_soup = BeautifulSoup(datail_content,'lxml')
     tr_list_soup = datail_soup.select('#tab-2 > tbody')
+    #print(tr_list_soup,'-----')
     index = 1
+    if len(tr_list_soup) <= 0 :
+        return ret_list
     for tr in tr_list_soup[0]:
         str_selector = '#tab-2 > tbody > tr:nth-child({}) > td:nth-child(2) > div.sc-name > a:nth-child(2)'.format(index)
         part_soup = datail_soup.select(str_selector)
@@ -39,6 +44,7 @@ def get_deatail_data(href):
             continue
         ret_list.append(part_soup[0].string)
         index = index + 1
+    driver.quit()
     return ret_list
 
 #tab-2 > tbody > tr:nth-child(1) > td:nth-child(2) > div.sc-name > a:nth-child(2)
@@ -63,7 +69,7 @@ def get_new_share_url():
 
 """通过营业部数据链接获取买入前五名的营业部名字"""
 def get_buisness_part_list(stock_data_url):
-
+    driver = webdriver.Chrome('C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe')
     driver.get(stock_data_url)
     time.sleep(3)
     buisness_part_html = driver.execute_script("return document.documentElement.outerHTML")
@@ -80,6 +86,7 @@ def get_buisness_part_list(stock_data_url):
             continue
         part_lsit = get_deatail_data(elem.get('href'))
         ret_list.append(part_lsit)
+    driver.quit()
     return ret_list
 
 """获得数据行的url"""
@@ -92,11 +99,12 @@ def get_data_url_soup(stock_list_soup, row_index):
 def get_table_soup(stock_list_soup, row_index,sub_index):
     str_info = '#table_wrapper-table > tbody > tr:nth-child({}) > td:nth-child({})'.format(row_index, sub_index)
     soup = stock_list_soup.select(str_info)
-    return soup,str_info
+    return soup
 
 if __name__ == '__main__':
     new_share_url = get_new_share_url()
     print(new_share_url)
+    driver = webdriver.Chrome('C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe')
     driver.get(new_share_url)
     time.sleep(3)
     stock_list_html =  driver.execute_script("return document.documentElement.outerHTML")
@@ -109,7 +117,7 @@ if __name__ == '__main__':
     data_url_index = 4
     listed_date_index = 18
     year = 2019
-    month = 11
+    month = 10
     # table_wrapper-table > tbody > tr:nth-child(1) > td:nth-child(18)
     # table_wrapper-table > tbody > tr:nth-child(2) > td:nth-child(18)
     input_data = '{}-{}-01'.format(year,month)
@@ -120,18 +128,22 @@ if __name__ == '__main__':
     stock_pattern = re.compile('^688\d{3}$')
     print(input_data,input_data_end)
     final_info = []
+
     while 1:
         if(row_index > 20):
             row_index = 1
-            driver.find_elements_by_xpath("//*[@id=\"main-table_paginate\"]/a[2]")[0].click()
+
+            elem = driver.find_elements_by_xpath("//*[@id=\"main-table_paginate\"]/a[2]")
+            print(elem)
+            elem[0].click()
+            time.sleep(2)
             driver.get(new_share_url)
-            time.sleep(3)
-            driver.get(new_share_url)
+            time.sleep(2)
             stock_list_html = driver.execute_script("return document.documentElement.outerHTML")
             # print(stock_list_html)
             stock_list_soup = BeautifulSoup(stock_list_html, 'lxml')
         """筛掉所有小于给定日期的股票"""
-        listed_date_soup,str_stock_date = get_table_soup(stock_list_soup,row_index,listed_date_index)
+        listed_date_soup = get_table_soup(stock_list_soup,row_index,listed_date_index)
         listed_date = listed_date_soup[0].string
         print(row_index,listed_date)
         if listed_date > input_data_end:
@@ -154,7 +166,7 @@ if __name__ == '__main__':
         stock_data_url  = data_url_soup[0].get('href')
         part_list = get_buisness_part_list(stock_data_url)
         #final_dic = {"股票代码":str_stock_code,"股票名称":str_stock_name,"上市日期":str_stock_date,"营业部信息":part_list}
-        final_info.append(final_dic)
+        #final_info.append(final_dic)
         row_index = row_index + 1
     print(final_info)
     driver.quit()
