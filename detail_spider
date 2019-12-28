@@ -24,8 +24,8 @@ import argparse
 """
 baseurl = "http://www.eastmoney.com"
 data_url = 'http://data.eastmoney.com'
+"""下载chrome浏览器对应的驱动文件，放到chrome.exe统计目录，然后在代码中加入该位置"""
 driver_path = 'C:\\Users\Administrator\\AppData\\Local\\Google\\Chrome\\Application\\chromedriver.exe'
-#//*[@id="main-table_paginate"]/a[2]
 
 """获得明细链接的龙虎榜数据"""
 def get_deatail_data(href):
@@ -36,7 +36,6 @@ def get_deatail_data(href):
     time.sleep(2)
     driver.get(href)
     datail_content = driver.execute_script("return document.documentElement.outerHTML")
-    # tab-2 > tbody
     datail_soup = BeautifulSoup(datail_content,'lxml')
     tr_list_soup = datail_soup.select('#tab-2 > tbody')
     #print(tr_list_soup,'-----')
@@ -53,10 +52,6 @@ def get_deatail_data(href):
         index = index + 1
     driver.quit()
     return ret_list
-
-#tab-2 > tbody > tr:nth-child(1) > td:nth-child(2) > div.sc-name > a:nth-child(2)
-#tab-2 > tbody > tr:nth-child(2) > td:nth-child(2) > div.sc-name > a:nth-child(2)
-# tab-2 > tbody > tr:nth-child(3) > td:nth-child(2) > div.sc-name > a:nth-child(2)
 
 """获得新股连接的url地址"""
 def get_new_share_url():
@@ -136,9 +131,6 @@ if __name__ == '__main__':
     stock_name_index = 3
     data_url_index = 4
     listed_date_index = 18
-
-    # table_wrapper-table > tbody > tr:nth-child(1) > td:nth-child(18)
-    # table_wrapper-table > tbody > tr:nth-child(2) > td:nth-child(18)
     input_data = '{}-{}-01'.format(year,month)
     if month+1 > 12:
         year = year+1
@@ -152,6 +144,7 @@ if __name__ == '__main__':
     while 1:
         if(row_index > 20):
             row_index = 1
+            """获取下一页对应的元素所处的xpath值"""
             elem = driver.find_elements_by_xpath("//*[@id=\"main-table_paginate\"]/a[2]")
             print(elem)
             elem[0].click()
